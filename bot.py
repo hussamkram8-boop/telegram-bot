@@ -1,136 +1,83 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import asyncio
 import yfinance as yf
 import pandas as pd
 import ta
+from telegram import Bot
 
-import os
-TOKEN = os.environ.get("TOKEN")
+TOKEN = "8248315922:AAGcgFTRbtffoJOUr_WLbyc3JbttFxQEZk4"
+CHAT_ID = None
 
-TIMEFRAMES = {
-    "M5": "5m",
-    "M15": "15m"
-}
+pairs = [
+"EURUSD=X",
+"GBPUSD=X",
+"USDJPY=X",
+"AUDUSD=X",
+"USDCAD=X",
+"EURJPY=X",
+"GBPJPY=X"
+]
 
-def analyze_market(symbol, tf):
-    if tf not in TIMEFRAMES:
-        return "❌ الفريم غير مدعوم (المتاح: M5 / M15)"
+bot = Bot(token=TOKEN)
 
-    pair = symbol + "=X"
-    interval = TIMEFRAMES[tf]
+def analyze_pair(pair):
+    data = yf.download(pair, interval="5m", period="1d", progress=False)
 
-    data = yf.download(pair, period="1d", interval=interval, progress=False)
+    if data is None or data.empty:
+        return None
 
-    if data.empty or len(data) < 20:
-        return "❌ لا توجد بيانات كافية حالياً"
+    close = data["Close"].squeeze()
 
-    # تنظيف الأعمدة
-    data = data.reset_index()
+    rsi = ta.momentum.RSIIndicator(close=close).rsi().iloc[-1]
+    macd = ta.trend.MACD(close=close).macd_diff().iloc[-1]
+    ema20 = ta.trend.EMAIndicator(close=close, window=20).ema_indicator().iloc[-1]
 
-    close = data["Close"]
-    open_ = data["Open"]
-    high = data["High"]
-    low = data["Low"]
+    price = close.iloc[-1]
 
-    price = round(close.iloc[-1], 5)
+    signal = "انتظار"
+    reason = ""
 
-    # RSI
-    rsi = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
+    if rsi < 30 and macd > 0 and price > ema20:
+        signal = "BUY"
+        reason = "تشبع بيع + صعود MACD + فوق EMA"
+    elif rsi > 70 and macd < 0 and price < ema20:
+        signal = "SELL"
+        reason = "تشبع شراء + هبوط MACD + تحت EMA"
 
-    # ATR
-    atr = ta.volatility.AverageTrueRange(
-        high=high, low=low, close=close, window=14
-    ).average_true_range().iloc[-1]
+    if signal == "انتظار":
+        return None
 
-    atr = round(atr, 5)
+    tp = price + 0.005 if signal=="BUY" else price - 0.005
+    sl = price - 0.003 if signal=="BUY" else price + 0.003
 
-    if atr < 0.0005:
-        return "⚠️ السوق ضعيف (ATR منخفض)\n❌ لا يُنصح بالدخول"
+    msg = f"""
+🔥 فرصة تداول
 
-    # اتجاه RSI
-    if rsi < 40:
-        decision = "SELL 🔴"
-        direction = "هابط"
-    elif rsi > 60:
-        decision = "BUY 🟢"
-        direction = "صاعد"
-    else:
-        return f"⚠️ السوق متذبذب\nRSI = {round(rsi,2)}\n❌ لا توجد إشارة واضحة"
+الزوج: {pair.replace("=X","")}
+الاشارة: {signal}
 
-    # تأكيد الشمعة
-    candle_ok = False
-    if decision.startswith("SELL") and close.iloc[-1] < open_.iloc[-1]:
-        candle_ok = True
-    if decision.startswith("BUY") and close.iloc[-1] > open_.iloc[-1]:
-        candle_ok = True
+الدخول: {price:.5f}
+الهدف: {tp:.5f}
+الوقف: {sl:.5f}
 
-    if not candle_ok:
-        return (
-            f"⚠️ تعارض بالإشارة\n"
-            f"RSI: {round(rsi,2)} ({decision})\n"
-            f"❌ الشمعة غير مؤكِّدة\n"
-            f"📌 تحليل فقط"
-        )
-
-    # TP / SL
-    if decision.startswith("SELL"):
-        sl = price + atr
-        tp = price - (atr * 2)
-    else:
-        sl = price - atr
-        tp = price + (atr * 2)
-
-    sl = round(sl, 5)
-    tp = round(tp, 5)
-
-    return f"""
-📊 {symbol} - {tf}
-
-📉 الاتجاه: {direction}
-🎯 القرار: {decision}
-
-💰 السعر الحالي: {price}
-📈 RSI: {round(rsi,2)}
-🌊 ATR: {atr}
-
-🧠 سبب الدخول:
-- RSI قوي
-- شمعة مؤكِّدة
-- زخم مناسب
-
-🎯 TP: {tp}
-🛑 SL: {sl}
-
-⚠️ القرار النهائي لك
+السبب: {reason}
+RSI: {rsi:.1f}
 """
+    return msg
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🤖 أهلاً بك!\n\n"
-        "الأوامر:\n"
-        "/analyze GBPUSD M5\n"
-        "/analyze GBPUSD M15\n\n"
-        "⛔ M1 غير مدعوم\n"
-        "🧠 التحليل ذكي + فلترة قوية"
-    )
+async def main():
+    global CHAT_ID
+    updates = await bot.get_updates()
+    if updates:
+        CHAT_ID = updates[-1].message.chat_id
 
-async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        symbol = context.args[0].upper()
-        tf = context.args[1].upper()
-    except:
-        await update.message.reply_text("❗ الصيغة الصحيحة:\n/analyze GBPUSD M5")
-        return
+    print("البوت يعمل الآن 🔥")
 
-    result = analyze_market(symbol, tf)
-    await update.message.reply_text(result)
+    while True:
+        for pair in pairs:
+            res = analyze_pair(pair)
+            if res and CHAT_ID:
+                await bot.send_message(chat_id=CHAT_ID, text=res)
 
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("analyze", analyze))
-    print("🤖 Bot is running...")
-    app.run_polling()
+        await asyncio.sleep(900)
 
-if __name__ == "__main__":
-    main()
+asyncio.run(main())
