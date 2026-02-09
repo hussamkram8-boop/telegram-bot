@@ -19,12 +19,11 @@ def analyze(pair, tf):
     if data is None or data.empty:
         return None
 
-  close = data["Close"]
+    close = data["Close"]
+    if close is None or len(close) < 2:
+        return None
 
-if close is None or len(close) < 2:
-    return None
-
-price = close.iloc[-1]
+    price = close.iloc[-1]
 
     rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
     macd = ta.trend.MACD(close).macd_diff().iloc[-1]
@@ -34,12 +33,29 @@ price = close.iloc[-1]
     قوة = 0
     سبب = []
 
-    if price > ema20: قوة += 15; سبب.append("فوق EMA20")
-    if price > ema50: قوة += 15; سبب.append("فوق EMA50")
-    if rsi < 35: قوة += 20; سبب.append("تشبع بيع")
-    if rsi > 65: قوة += 20; سبب.append("تشبع شراء")
-    if macd > 0: قوة += 15; سبب.append("MACD صاعد")
-    if macd < 0: قوة += 15; سبب.append("MACD هابط")
+    if price > ema20:
+        قوة += 15
+        سبب.append("فوق EMA20")
+
+    if price > ema50:
+        قوة += 15
+        سبب.append("فوق EMA50")
+
+    if rsi < 35:
+        قوة += 20
+        سبب.append("تشبع بيع")
+
+    if rsi > 65:
+        قوة += 20
+        سبب.append("تشبع شراء")
+
+    if macd > 0:
+        قوة += 15
+        سبب.append("MACD صاعد")
+
+    if macd < 0:
+        قوة += 15
+        سبب.append("MACD هابط")
 
     if قوة < 60:
         return None
@@ -72,6 +88,7 @@ price = close.iloc[-1]
 {", ".join(سبب)}
 """
     return رسالة
+
 
 async def main():
     global CHAT_ID
