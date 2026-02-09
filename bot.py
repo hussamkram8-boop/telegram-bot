@@ -19,8 +19,12 @@ def analyze(pair, tf):
     if data is None or data.empty:
         return None
 
-    close = data["Close"].squeeze()
-    price = close.iloc[-1]
+  close = data["Close"]
+
+if close is None or len(close) < 2:
+    return None
+
+price = close.iloc[-1]
 
     rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
     macd = ta.trend.MACD(close).macd_diff().iloc[-1]
