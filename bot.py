@@ -36,23 +36,18 @@ def analyze(pair, tf):
     if price > ema20:
         قوة += 15
         سبب.append("فوق EMA20")
-
     if price > ema50:
         قوة += 15
         سبب.append("فوق EMA50")
-
     if rsi < 35:
         قوة += 20
         سبب.append("تشبع بيع")
-
     if rsi > 65:
         قوة += 20
         سبب.append("تشبع شراء")
-
     if macd > 0:
         قوة += 15
         سبب.append("MACD صاعد")
-
     if macd < 0:
         قوة += 15
         سبب.append("MACD هابط")
@@ -88,7 +83,6 @@ def analyze(pair, tf):
 {", ".join(سبب)}
 """
     return رسالة
-
 
 async def main():
     global CHAT_ID
