@@ -19,7 +19,7 @@ def analyze(pair, tf):
     if data is None or data.empty:
         return None
 
-    close = data["Close"]
+close = data["Close"].squeeze()
     if close is None or len(close) < 2:
         return None
 
