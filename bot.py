@@ -10,6 +10,32 @@ CHAT_ID = None
 bot = Bot(token=TOKEN)
 
 pair = "GC=F"   # الذهب العالمي
+# ===== الرد على الرسائل =====
+async def reply_updates():
+    global CHAT_ID
+
+    updates = await bot.get_updates()
+
+    for update in updates:
+        if update.message:
+            chat_id = update.message.chat_id
+            text = update.message.text.lower()
+
+            CHAT_ID = chat_id
+
+            if "هلا" in text or "hi" in text or "start" in text:
+                await bot.send_message(chat_id=chat_id, text="🔥 البوت شغال ويراقب الذهب")
+
+            elif "سعر" in text:
+                data = yf.download("GC=F", period="1d", interval="1m")
+                price = float(data["Close"].iloc[-1])
+                await bot.send_message(chat_id=chat_id, text=f"💰 سعر الذهب الآن: {price}")
+
+            elif "تحليل" in text:
+                await bot.send_message(chat_id=chat_id, text="📊 الذهب تحت المراقبة… أي سكالب قوي راح يوصلك")
+
+            elif "وضع" in text:
+                await bot.send_message(chat_id=chat_id, text="📈 السوق متقلب حالياً — سكالب شغال")
 
 def analyze():
     data = yf.download(pair, interval="5m", period="1d", progress=False)
