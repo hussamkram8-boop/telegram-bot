@@ -111,3 +111,47 @@ async def main():
 
 
 asyncio.run(main())
+
+# ====== الرد على الرسائل ======
+
+async def reply_updates():
+    global CHAT_ID
+
+    updates = await bot.get_updates()
+
+    for update in updates:
+        if update.message:
+            chat_id = update.message.chat_id
+            text = update.message.text.lower()
+
+            CHAT_ID = chat_id
+
+            if "هلا" in text or "hi" in text or "start" in text:
+                await bot.send_message(chat_id=chat_id, text="🔥 البوت شغال ويراقب الذهب")
+
+            elif "سعر" in text:
+                data = yf.download("GC=F", period="1d", interval="1m")
+                price = float(data["Close"].iloc[-1])
+                await bot.send_message(chat_id=chat_id, text=f"💰 سعر الذهب الآن: {price}")
+
+            elif "تحليل" in text:
+                await bot.send_message(chat_id=chat_id, text="📊 السوق حالياً تحت المراقبة… أي فرصة قوية راح توصلك")
+
+            elif "وضع" in text:
+                await bot.send_message(chat_id=chat_id, text="📈 السوق متقلب حالياً — السكالب شغال")
+
+
+# نضيفها لللوب الرئيسي
+async def main():
+    global CHAT_ID
+
+    print("GOLD BOT STARTED 🔥")
+
+    while True:
+        await reply_updates()
+
+        signal = analyze()
+        if signal and CHAT_ID:
+            await bot.send_message(chat_id=CHAT_ID, text=signal)
+
+        await asyncio.sleep(300)
