@@ -103,6 +103,8 @@ async def main():
     print("GOLD BOT STARTED 🔥")
 
     while True:
+        await reply_updates()
+        
         signal = analyze()
         if signal and CHAT_ID:
             await bot.send_message(chat_id=CHAT_ID, text=signal)
