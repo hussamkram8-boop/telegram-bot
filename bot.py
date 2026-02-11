@@ -1,12 +1,3 @@
-import os
-import sys
-
-# يمنع تشغيل أكثر من نسخة
-if os.environ.get("BOT_RUNNING") == "1":
-    sys.exit()
-
-os.environ["BOT_RUNNING"] = "1"
-
 import asyncio
 import yfinance as yf
 import ta
@@ -21,12 +12,10 @@ pair = "GC=F"
 
 # ===== وقت التداول =====
 def trading_time():
-    now = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-    if 10 <= now.hour <= 23:
-        return True
-    return False
+    now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=3)
+    return 10 <= now.hour <= 23
 
-# ===== ردود البوت =====
+# ===== قراءة رسائل =====
 last_update_id = None
 
 async def reply_updates():
@@ -38,36 +27,33 @@ async def reply_updates():
         last_update_id = update.update_id + 1
 
         if update.message:
-            chat_id = update.message.chat_id
-            CHAT_ID = chat_id
+            CHAT_ID = update.message.chat_id
             text = update.message.text.lower()
 
-            if "/start" in text or "هلا" in text:
-                await bot.send_message(chat_id, "🔥 البوت شغال ويراقب الذهب")
+            if "/start" in text:
+                await bot.send_message(CHAT_ID, "🔥 البوت شغال ويراقب الذهب")
 
-            elif "حالة" in text or "status" in text:
-                await bot.send_message(chat_id, "🟢 البوت يعمل ويحلل الذهب الآن")
+            elif "حالة" in text:
+                await bot.send_message(CHAT_ID, "🟢 البوت يعمل الآن")
 
             elif "تحليل" in text:
-                await bot.send_message(chat_id, "📊 السوق تحت المراقبة — أي فرصة قوية راح توصلك")
+                await bot.send_message(CHAT_ID, "📊 السوق تحت المراقبة")
 
-            elif "سعر" in text:
-                data = yf.download(pair, period="1d", interval="1m")
-                price = float(data["Close"].iloc[-1])
-                await bot.send_message(chat_id, f"💰 سعر الذهب الآن: {price}")
-
-# ===== تحليل =====
+# ===== تحليل الذهب =====
 def analyze():
     if not trading_time():
         return None
 
     data = yf.download(pair, interval="5m", period="1d", progress=False)
-    if data.empty:
+
+    if data is None or data.empty:
         return None
 
-close = data["Close"].squeeze()
-price = float(close.iloc[-1])
+    close = data["Close"].squeeze()
+    if len(close) < 50:
+        return None
 
+    price = float(close.iloc[-1])
 
     rsi = ta.momentum.RSIIndicator(close, 14).rsi().iloc[-1]
     ema20 = ta.trend.EMAIndicator(close, 20).ema_indicator().iloc[-1]
