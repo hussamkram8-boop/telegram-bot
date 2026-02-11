@@ -65,8 +65,9 @@ def analyze():
     if data.empty:
         return None
 
-    close = data["Close"]
-    price = float(close.iloc[-1])
+close = data["Close"].squeeze()
+price = float(close.iloc[-1])
+
 
     rsi = ta.momentum.RSIIndicator(close, 14).rsi().iloc[-1]
     ema20 = ta.trend.EMAIndicator(close, 20).ema_indicator().iloc[-1]
