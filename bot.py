@@ -169,15 +169,20 @@ Entry: {price:.2f}
 
 # ===== التشغيل =====
 async def main():
+    global start_sent, CHAT_ID
+
     print("🔥 GOLD VIP SNIPER BOT STARTED")
 
     while True:
         await reply_updates()
+
+        # ارسال رسالة التشغيل مرة وحدة فقط
+        if CHAT_ID and not start_sent:
+            await bot.send_message(chat_id=CHAT_ID, text="🔥 GOLD VIP BOT ACTIVE")
+            start_sent = True
 
         signal = analyze()
         if signal and CHAT_ID:
             await bot.send_message(chat_id=CHAT_ID, text=signal)
 
         await asyncio.sleep(300)
-
-asyncio.run(main())
