@@ -18,12 +18,16 @@ def trading_time():
     return False
 
 # ===== ردود البوت =====
-async def reply_updates():
-    global CHAT_ID
+last_update_id = None
 
-    updates = await bot.get_updates()
+async def reply_updates():
+    global CHAT_ID, last_update_id
+
+    updates = await bot.get_updates(offset=last_update_id, timeout=10)
 
     for update in updates:
+        last_update_id = update.update_id + 1
+
         if update.message:
             chat_id = update.message.chat_id
             CHAT_ID = chat_id
