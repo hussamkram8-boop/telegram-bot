@@ -45,15 +45,23 @@ def news_time():
 # ===== الرد على الرسائل =====
 async def reply_updates():
     global CHAT_ID
-    updates = await bot.get_updates()
+    updates = await bot.get_updates() 
 
-    for update in updates:
+     for update in updates:
         if update.message:
             CHAT_ID = update.message.chat_id
             text = update.message.text.lower()
 
             if "start" in text or "هلا" in text:
-                await bot.send_message(CHAT_ID, "🔥 GOLD VIP BOT ACTIVE")
+                await bot.send_message(CHAT_ID, "🔥 GOLD VIP BOT ACTIVE") 
+                elif "حالة" in text or "status" in text:
+    await bot.send_message(chat_id=chat_id,
+    text="🟢 البوت شغال الآن ويحلل الذهب\n👑 وضع VIP مفعل\n📡 المراقبة مستمرة")
+
+elif "تحليل" in text:
+    await bot.send_message(chat_id=chat_id,
+    text="📊 البوت حالياً يراقب الذهب...\nأي فرصة قوية راح توصلك فوراً 🚨")
+
 
             elif "وضع" in text:
                 await bot.send_message(CHAT_ID, "👑 VIP SNIPER MODE")
