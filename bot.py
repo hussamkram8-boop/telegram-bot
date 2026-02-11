@@ -21,7 +21,7 @@ last_update_id = None
 async def reply_updates():
     global CHAT_ID, last_update_id
 
-    updates = await bot.get_updates(offset=last_update_id, timeout=10)
+updates = await bot.get_updates(timeout=10)
 
     for update in updates:
         last_update_id = update.update_id + 1
