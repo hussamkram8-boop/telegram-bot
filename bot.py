@@ -1,3 +1,12 @@
+import os
+import sys
+
+# يمنع تشغيل أكثر من نسخة
+if os.environ.get("BOT_RUNNING") == "1":
+    sys.exit()
+
+os.environ["BOT_RUNNING"] = "1"
+
 import asyncio
 import yfinance as yf
 import ta
