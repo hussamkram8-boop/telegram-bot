@@ -1,179 +1,175 @@
 import asyncio
 import yfinance as yf
-import pandas as pd
 import ta
+import datetime
 from telegram import Bot
 
 TOKEN = "8248315922:AAGcgFTRbtffoJOUr_WLbyc3JbttFxQEZk4"
 CHAT_ID = None
-
 bot = Bot(token=TOKEN)
 
-pair = "GC=F"   # الذهب العالمي
+pair = "GC=F"
+
+# ===== إعداد VIP =====
+MAX_SIGNALS_PER_DAY = 5
+MIN_CONFIDENCE = 85
+
+signals_today = 0
+last_day = datetime.date.today()
+
+# ===== وقت التداول لندن + أمريكا =====
+def trading_time():
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=3)  # توقيت العراق
+    hour = now.hour
+    if 10 <= hour <= 23:
+        return True
+    return False
+
+# ===== أوقات الأخبار =====
+def news_time():
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+    h = now.hour
+    m = now.minute
+
+    news_slots = [
+        (15,30),
+        (17,0),
+        (21,30)
+    ]
+
+    for nh, nm in news_slots:
+        if h == nh and abs(m-nm) <= 20:
+            return True
+    return False
+
 # ===== الرد على الرسائل =====
 async def reply_updates():
     global CHAT_ID
-
     updates = await bot.get_updates()
 
     for update in updates:
         if update.message:
-            chat_id = update.message.chat_id
+            CHAT_ID = update.message.chat_id
             text = update.message.text.lower()
 
-            CHAT_ID = chat_id
-
-            if "هلا" in text or "hi" in text or "start" in text:
-                await bot.send_message(chat_id=chat_id, text="🔥 البوت شغال ويراقب الذهب")
-
-            elif "سعر" in text:
-                data = yf.download("GC=F", period="1d", interval="1m")
-                price = float(data["Close"].iloc[-1])
-                await bot.send_message(chat_id=chat_id, text=f"💰 سعر الذهب الآن: {price}")
-
-            elif "تحليل" in text:
-                await bot.send_message(chat_id=chat_id, text="📊 الذهب تحت المراقبة… أي سكالب قوي راح يوصلك")
+            if "start" in text or "هلا" in text:
+                await bot.send_message(CHAT_ID, "🔥 GOLD VIP BOT ACTIVE")
 
             elif "وضع" in text:
-                await bot.send_message(chat_id=chat_id, text="📈 السوق متقلب حالياً — سكالب شغال")
+                await bot.send_message(CHAT_ID, "👑 VIP SNIPER MODE")
 
+            elif "سعر" in text:
+                data = yf.download(pair, period="1d", interval="1m")
+                price = float(data["Close"].iloc[-1])
+                await bot.send_message(CHAT_ID, f"💰 سعر الذهب: {price}")
+
+# ===== تحليل VIP =====
 def analyze():
+    global signals_today, last_day
+
+    if not trading_time():
+        return None
+
+    if news_time():
+        return None
+
+    # تصفير يومي
+    if datetime.date.today() != last_day:
+        signals_today = 0
+        last_day = datetime.date.today()
+
+    if signals_today >= MAX_SIGNALS_PER_DAY:
+        return None
+
     data = yf.download(pair, interval="5m", period="1d", progress=False)
-
-    if data is None or data.empty:
+    if data.empty or len(data) < 60:
         return None
 
-    close = data["Close"].squeeze()
-    if close is None or len(close) < 50:
-        return None
-
+    close = data["Close"]
     price = float(close.iloc[-1])
 
-    rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
-    macd = ta.trend.MACD(close).macd_diff().iloc[-1]
-    ema20 = ta.trend.EMAIndicator(close, window=20).ema_indicator().iloc[-1]
-    ema50 = ta.trend.EMAIndicator(close, window=50).ema_indicator().iloc[-1]
+    rsi = ta.momentum.RSIIndicator(close, 14).rsi().iloc[-1]
+    ema20 = ta.trend.EMAIndicator(close, 20).ema_indicator().iloc[-1]
+    ema50 = ta.trend.EMAIndicator(close, 50).ema_indicator().iloc[-1]
 
-    قوة = 50
-    سبب = []
+    # دعم ومقاومة
+    high = data["High"].rolling(20).max().iloc[-1]
+    low = data["Low"].rolling(20).min().iloc[-1]
 
-    if price > ema20:
-        قوة += 10
-        سبب.append("فوق EMA20")
-
-    if price > ema50:
-        قوة += 10
-        سبب.append("فوق EMA50")
-
-    if rsi > 55:
-        قوة += 10
-        سبب.append("RSI صاعد")
-
-    if rsi < 45:
-        قوة += 10
-        سبب.append("RSI نازل")
-
-    if macd > 0:
-        قوة += 10
-        سبب.append("زخم صاعد")
-
-    if macd < 0:
-        قوة += 10
-        سبب.append("زخم هابط")
-
-    if قوة < 60:
+    if abs(price - high) < 3:
+        return None
+    if abs(price - low) < 3:
         return None
 
-    if rsi > 55 and macd > 0 and price > ema20:
-        نوع = "BUY"
-        tp = price + 2
-        sl = price - 1
-        اتجاه = "صعود قوي"
+    confidence = 75
+    reasons = []
 
-    elif rsi < 45 and macd < 0 and price < ema20:
-        نوع = "SELL"
-        tp = price - 2
-        sl = price + 1
-        اتجاه = "هبوط قوي"
+    if ema20 > ema50:
+        confidence += 10
+        reasons.append("ترند صاعد")
+    else:
+        confidence -= 5
 
+    if rsi > 55:
+        confidence += 10
+        reasons.append("RSI إيجابي")
+
+    if rsi < 45:
+        confidence += 10
+        reasons.append("RSI سلبي")
+
+    if confidence < MIN_CONFIDENCE:
+        return None
+
+    # ===== دخول =====
+    sniper = False
+
+    if ema20 > ema50 and rsi > 60:
+        side = "BUY 🟢"
+        tp = price + 25
+        sl = price - 12
+        trend = "زخم صاعد قوي"
+        if confidence >= 95:
+            sniper = True
+
+    elif ema20 < ema50 and rsi < 40:
+        side = "SELL 🔴"
+        tp = price - 25
+        sl = price + 12
+        trend = "زخم هابط قوي"
+        if confidence >= 95:
+            sniper = True
     else:
         return None
 
-    رسالة = f"""
-⚡ GOLD SCALPING SIGNAL
+    signals_today += 1
 
-{نوع} GOLD 🪙
-الدخول: {price:.2f}
+    if sniper:
+        header = "🚨 GOLD SNIPER ENTRY 🚨"
+    else:
+        header = "👑 GOLD VIP SIGNAL"
 
-🎯 الهدف: {tp:.2f}
-🛑 الوقف: {sl:.2f}
+    return f"""
+{header}
 
-📊 القوة: {قوة}%
+{side}
+Entry: {price:.2f}
 
-🧠 التحليل:
-- {اتجاه}
-- {", ".join(سبب)}
+🎯 TP: {tp:.2f}
+🛑 SL: {sl:.2f}
 
-📱 الدخول اختياري
+📊 Confidence: {confidence}%
+
+🧠 Analysis:
+- {trend}
+- {" | ".join(reasons)}
+
+📡 VIP BOT
 """
-    return رسالة
 
-
+# ===== التشغيل =====
 async def main():
-    global CHAT_ID
-
-    updates = await bot.get_updates()
-    if updates:
-        CHAT_ID = updates[-1].message.chat_id
-
-    print("GOLD BOT STARTED 🔥")
-
-    while True:
-        await reply_updates()
-        
-        signal = analyze()
-        if signal and CHAT_ID:
-            await bot.send_message(chat_id=CHAT_ID, text=signal)
-
-        await asyncio.sleep(300)  # كل 5 دقائق
-
-
-asyncio.run(main())
-
-# ====== الرد على الرسائل ======
-
-async def reply_updates():
-    global CHAT_ID
-
-    updates = await bot.get_updates()
-
-    for update in updates:
-        if update.message:
-            chat_id = update.message.chat_id
-            text = update.message.text.lower()
-
-            CHAT_ID = chat_id
-
-            if "هلا" in text or "hi" in text or "start" in text:
-                await bot.send_message(chat_id=chat_id, text="🔥 البوت شغال ويراقب الذهب")
-
-            elif "سعر" in text:
-                data = yf.download("GC=F", period="1d", interval="1m")
-                price = float(data["Close"].iloc[-1])
-                await bot.send_message(chat_id=chat_id, text=f"💰 سعر الذهب الآن: {price}")
-
-            elif "تحليل" in text:
-                await bot.send_message(chat_id=chat_id, text="📊 السوق حالياً تحت المراقبة… أي فرصة قوية راح توصلك")
-
-            elif "وضع" in text:
-                await bot.send_message(chat_id=chat_id, text="📈 السوق متقلب حالياً — السكالب شغال")
-
-
-# نضيفها لللوب الرئيسي
-async def main():
-    global CHAT_ID
-
-    print("GOLD BOT STARTED 🔥")
+    print("🔥 GOLD VIP SNIPER BOT STARTED")
 
     while True:
         await reply_updates()
@@ -183,3 +179,5 @@ async def main():
             await bot.send_message(chat_id=CHAT_ID, text=signal)
 
         await asyncio.sleep(300)
+
+asyncio.run(main())
