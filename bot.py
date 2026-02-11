@@ -15,29 +15,25 @@ def trading_time():
     now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=3)
     return 10 <= now.hour <= 23
 
-# ===== قراءة رسائل =====
-last_update_id = None
-
+# ===== الرد على الرسائل =====
 async def reply_updates():
-    global CHAT_ID, last_update_id
+    global CHAT_ID
 
-updates = await bot.get_updates(timeout=10)
+    updates = await bot.get_updates()
 
     for update in updates:
-        last_update_id = update.update_id + 1
-
         if update.message:
             CHAT_ID = update.message.chat_id
             text = update.message.text.lower()
 
-            if "/start" in text:
-                await bot.send_message(CHAT_ID, "🔥 البوت شغال ويراقب الذهب")
+            if "/start" in text or "هلا" in text:
+                await bot.send_message(chat_id=CHAT_ID, text="🔥 البوت شغال ويراقب الذهب")
 
             elif "حالة" in text:
-                await bot.send_message(CHAT_ID, "🟢 البوت يعمل الآن")
+                await bot.send_message(chat_id=CHAT_ID, text="🟢 البوت يعمل الآن ويحلل الذهب")
 
             elif "تحليل" in text:
-                await bot.send_message(CHAT_ID, "📊 السوق تحت المراقبة")
+                await bot.send_message(chat_id=CHAT_ID, text="📊 الذهب تحت المراقبة — أي فرصة قوية راح توصلك")
 
 # ===== تحليل الذهب =====
 def analyze():
