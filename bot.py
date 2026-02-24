@@ -8,7 +8,6 @@ TOKEN = "8248315922:AAGcgFTRbtffoJOUr_WLbyc3JbttFxQEZk4"
 CHAT_ID = None
 bot = Bot(token=TOKEN)
 
-# ===== الأزواج =====
 pairs = {
     "XAUUSDT": "GOLD",
     "EURUSDT": "EURUSD",
@@ -22,21 +21,27 @@ def trading_time():
     now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=3)
     return 9 <= now.hour <= 23
 
-# ===== جلب بيانات من Binance =====
+# ===== Binance data =====
 def get_binance(symbol, interval="15m", limit=200):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-    data = requests.get(url).json()
+    try:
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        data = requests.get(url, timeout=10).json()
 
-    if not isinstance(data, list):
+        if not isinstance(data, list):
+            return None
+
+        closes = [float(candle[4]) for candle in data]
+        return closes
+    except:
         return None
 
-    closes = [float(candle[4]) for candle in data]
-    return closes
-
-# ===== قراءة رسائل التليجرام =====
+# ===== قراءة الرسائل =====
 async def reply_updates():
     global CHAT_ID
-    updates = await bot.get_updates()
+    try:
+        updates = await bot.get_updates(timeout=30)
+    except:
+        return
 
     for update in updates:
         if update.message:
@@ -44,12 +49,18 @@ async def reply_updates():
             text = update.message.text.lower()
 
             if "/start" in text:
-                await bot.send_message(chat_id=CHAT_ID,
-                text="🔥 بوت VIP شغال — فقط ضربات قوية جداً")
+                try:
+                    await bot.send_message(chat_id=CHAT_ID,
+                    text="🔥 بوت VIP شغال — فقط ضربات قوية جداً")
+                except:
+                    pass
 
             if "حالة" in text:
-                await bot.send_message(chat_id=CHAT_ID,
-                text="🟢 البوت يعمل ويراقب أقوى الفرص فقط")
+                try:
+                    await bot.send_message(chat_id=CHAT_ID,
+                    text="🟢 البوت يعمل ويراقب أقوى الفرص فقط")
+                except:
+                    pass
 
 # ===== التحليل =====
 def analyze(pair_code, pair_name):
@@ -57,11 +68,8 @@ def analyze(pair_code, pair_name):
     if not trading_time():
         return None
 
-    try:
-        h1 = get_binance(pair_code, "1h", 200)
-        m15 = get_binance(pair_code, "15m", 200)
-    except:
-        return None
+    h1 = get_binance(pair_code, "1h", 200)
+    m15 = get_binance(pair_code, "15m", 200)
 
     if not h1 or not m15:
         return None
@@ -71,12 +79,10 @@ def analyze(pair_code, pair_name):
 
     price = float(m15[-1])
 
-    # تحويل لقائمة pandas
     import pandas as pd
     close_h1 = pd.Series(h1)
     close_m15 = pd.Series(m15)
 
-    # مؤشرات
     rsi_h1 = ta.momentum.RSIIndicator(close_h1, 14).rsi().iloc[-1]
     ema20_h1 = ta.trend.EMAIndicator(close_h1, 20).ema_indicator().iloc[-1]
     ema50_h1 = ta.trend.EMAIndicator(close_h1, 50).ema_indicator().iloc[-1]
@@ -86,24 +92,15 @@ def analyze(pair_code, pair_name):
     ema50_15 = ta.trend.EMAIndicator(close_m15, 50).ema_indicator().iloc[-1]
 
     confidence = 0
-    reason = []
 
     if ema20_h1 > ema50_h1:
         confidence += 30
-        reason.append("ترند صاعد قوي H1")
-
     if rsi_h1 > 55:
         confidence += 20
-        reason.append("زخم شراء قوي")
-
     if ema20_15 > ema50_15:
         confidence += 20
-        reason.append("تقاطع صاعد M15")
-
     if rsi_15 > 60:
         confidence += 20
-        reason.append("RSI قوي")
-
     if price > ema20_15:
         confidence += 10
 
@@ -147,7 +144,10 @@ async def main():
         for code, name in pairs.items():
             signal = analyze(code, name)
             if signal and CHAT_ID:
-                await bot.send_message(chat_id=CHAT_ID, text=signal)
+                try:
+                    await bot.send_message(chat_id=CHAT_ID, text=signal)
+                except:
+                    print("Telegram timeout...")
 
         await asyncio.sleep(600)
 
